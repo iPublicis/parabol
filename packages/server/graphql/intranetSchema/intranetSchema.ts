@@ -6,10 +6,12 @@ import suProOrgInfo from '../queries/suProOrgInfo'
 import suUserCount from '../queries/suUserCount'
 import addNewFeature from './mutations/addNewFeature'
 import autopauseUsers from './mutations/autopauseUsers'
+import backupOrganization from './mutations/backupOrganization'
 import connectSocket from './mutations/connectSocket'
 import disconnectSocket from './mutations/disconnectSocket'
 import draftEnterpriseInvoice from './mutations/draftEnterpriseInvoice'
 import dumpHeap from './mutations/dumpHeap'
+import enableSAMLForDomain from './mutations/enableSAMLForDomain'
 import endOldMeetings from './mutations/endOldMeetings'
 import flagConversionModal from './mutations/flagConversionModal'
 import flagOverLimit from './mutations/flagOverLimit'
@@ -55,6 +57,7 @@ const mutation = new GraphQLObjectType<any, GQLContext, any>({
   fields: () => ({
     addNewFeature,
     autopauseUsers,
+    backupOrganization,
     connectSocket,
     profileCPU,
     disconnectSocket,
@@ -64,6 +67,7 @@ const mutation = new GraphQLObjectType<any, GQLContext, any>({
     flagConversionModal,
     flagOverLimit,
     loginSAML,
+    enableSAMLForDomain,
     runScheduledJobs,
     sendBatchNotificationEmails,
     sendUpcomingInvoiceEmails,

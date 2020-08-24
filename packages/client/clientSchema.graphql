@@ -29,8 +29,9 @@ extend type User {
   clientClockOffset: Int
   dashSearch: String
   pageName: String
-  topOfFAB: Int
+  snackbarOffset: Int
   teamFilter: Team
+  showArchivedTasksCheckbox: Boolean!
 }
 
 extend type Task {
@@ -50,12 +51,8 @@ extend type RetroReflection {
   isEditing: Boolean
 }
 
-extend type RetroPhaseItem {
+extend type ReflectPrompt {
   editorIds: [ID!]
-}
-
-extend type RetrospectiveMeetingSettings {
-  activeTemplateId: String
 }
 
 extend interface NewMeetingStage {

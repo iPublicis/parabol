@@ -1,14 +1,12 @@
 import {InvoiceItemType} from 'parabol-client/types/constEnums'
-import shortid from 'shortid'
 import adjustUserCount from '../../../billing/helpers/adjustUserCount'
 import getRethink from '../../../database/rethinkDriver'
 import MeetingSettingsAction from '../../../database/types/MeetingSettingsAction'
 import MeetingSettingsRetrospective from '../../../database/types/MeetingSettingsRetrospective'
 import Team from '../../../database/types/Team'
+import TimelineEventCreatedTeam from '../../../database/types/TimelineEventCreatedTeam'
 import addTeamIdToTMS from '../../../safeMutations/addTeamIdToTMS'
 import insertNewTeamMember from '../../../safeMutations/insertNewTeamMember'
-import {CREATED_TEAM} from '../../types/TimelineEventTypeEnum'
-import makeRetroTemplates from './makeRetroTemplates'
 
 interface ValidNewTeam {
   id: string
@@ -27,11 +25,16 @@ export default async function createTeamAndLeader(userId: string, newTeam: Valid
     .run()
   const {tier} = organization
   const verifiedTeam = new Team({...newTeam, createdBy: userId, tier})
-  const {phaseItems, templates} = makeRetroTemplates(teamId)
   const meetingSettings = [
-    new MeetingSettingsRetrospective({teamId, selectedTemplateId: templates[0].id}),
+    new MeetingSettingsRetrospective({teamId}),
     new MeetingSettingsAction({teamId})
   ]
+  const timelineEvent = new TimelineEventCreatedTeam({
+    createdAt: new Date(Date.now() + 5),
+    userId,
+    teamId,
+    orgId
+  })
 
   const [organizationUser] = await Promise.all([
     r
@@ -52,30 +55,11 @@ export default async function createTeamAndLeader(userId: string, newTeam: Valid
       .table('MeetingSettings')
       .insert(meetingSettings)
       .run(),
-    // add customizable phase items for meetings
-    r
-      .table('CustomPhaseItem')
-      .insert(phaseItems)
-      .run(),
-    r
-      .table('ReflectTemplate')
-      .insert(templates)
-      .run(),
     // denormalize common fields to team member
     insertNewTeamMember(userId, teamId),
     r
       .table('TimelineEvent')
-      .insert({
-        id: shortid.generate(),
-        // + 5 to make sure it comes after parabol joined event
-        createdAt: new Date(Date.now() + 5),
-        interactionCount: 0,
-        seenCount: 0,
-        type: CREATED_TEAM,
-        userId,
-        teamId,
-        orgId
-      })
+      .insert(timelineEvent)
       .run(),
     addTeamIdToTMS(userId, teamId)
   ])

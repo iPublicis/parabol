@@ -31,6 +31,19 @@ export const agendaItemsByTeamId = new LoaderMakerForeign(
   }
 )
 
+export const agendaItemsByMeetingId = new LoaderMakerForeign(
+  'agendaItems',
+  'meetingId',
+  async (meetingIds) => {
+    const r = await getRethink()
+    return r
+      .table('AgendaItem')
+      .getAll(r.args(meetingIds), {index: 'meetingId'})
+      .orderBy('sortOrder')
+      .run()
+  }
+)
+
 export const atlassianAuthByUserId = new LoaderMakerForeign(
   'atlassianAuths',
   'userId',
@@ -77,16 +90,20 @@ export const completedMeetingsByTeamId = new LoaderMakerForeign(
   }
 )
 
-export const customPhaseItemsByTeamId = new LoaderMakerForeign(
-  'customPhaseItems',
-  'teamId',
-  async (teamIds) => {
+export const reflectPromptsByTemplateId = new LoaderMakerForeign(
+  'reflectPrompts',
+  'templateId',
+  async (templateIds) => {
     const r = await getRethink()
-    return r
-      .table('CustomPhaseItem')
-      .getAll(r.args(teamIds), {index: 'teamId'})
-      .filter({isActive: true})
-      .run()
+    return (
+      r
+        .table('ReflectPrompt')
+        .getAll(r.args(templateIds), {index: 'templateId'})
+        // NOTE: isActive must be false so we can see meetings in the past that use a now-inactive template
+        // .filter({isActive: true})
+        .orderBy('sortOrder')
+        .run()
+    )
   }
 )
 
@@ -122,19 +139,6 @@ export const meetingMembersByUserId = new LoaderMakerForeign(
     return r
       .table('MeetingMember')
       .getAll(r.args(userIds), {index: 'userId'})
-
-      .run()
-  }
-)
-
-export const meetingSettingsByTeamId = new LoaderMakerForeign(
-  'meetingSettings',
-  'teamId',
-  async (teamIds) => {
-    const r = await getRethink()
-    return r
-      .table('MeetingSettings')
-      .getAll(r.args(teamIds), {index: 'teamId'})
       .run()
   }
 )
@@ -189,6 +193,18 @@ export const retroReflectionGroupsByMeetingId = new LoaderMakerForeign(
   }
 )
 
+export const reflectTemplatesByOrgId = new LoaderMakerForeign(
+  'reflectTemplates',
+  'orgId',
+  async (orgId) => {
+    const r = await getRethink()
+    return r
+      .table('ReflectTemplate')
+      .getAll(r.args(orgId), {index: 'orgId'})
+      .filter({isActive: true})
+      .run()
+  }
+)
 export const reflectTemplatesByTeamId = new LoaderMakerForeign(
   'reflectTemplates',
   'teamId',
@@ -323,6 +339,20 @@ export const teamMembersByTeamId = new LoaderMakerForeign(
     return r
       .table('TeamMember')
       .getAll(r.args(teamIds), {index: 'teamId'})
+      .filter({isNotRemoved: true})
+      .run()
+  }
+)
+
+export const teamMembersByUserId = new LoaderMakerForeign(
+  'teamMembers',
+  'userId',
+  async (userIds) => {
+    // tasksByUserId is expensive since we have to look up each team to check the team archive status
+    const r = await getRethink()
+    return r
+      .table('TeamMember')
+      .getAll(r.args(userIds), {index: 'userId'})
       .filter({isNotRemoved: true})
       .run()
   }

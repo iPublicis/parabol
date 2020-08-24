@@ -9,10 +9,10 @@ const GENERIC_DOMAINS = [
   'mail.com'
 ]
 
-const isCompanyDomain = (domain: string) => !GENERIC_DOMAINS.includes(domain)
+const isCompanyDomain = (domain) => !GENERIC_DOMAINS.includes(domain)
 
-const getGroupMajority = (tlds: string[]) => {
-  const countByDomain = {} as {[tld: string]: number}
+const getGroupMajority = (tlds) => {
+  const countByDomain = {}
   tlds.forEach((tld) => {
     countByDomain[tld] = countByDomain[tld] || 0
     countByDomain[tld]++
@@ -29,17 +29,17 @@ const getGroupMajority = (tlds: string[]) => {
   return maxDomain
 }
 
-const getDomainFromEmail = (email: string) => {
+const getDomainFromEmail = (email) => {
   return email.slice(email.indexOf('@') + 1)
 }
 
-const getActiveDomainFromEmails = (emails: string[]) => {
+const getActiveDomainFromEmails = (emails) => {
   const tlds = emails.map(getDomainFromEmail)
   const companyDomains = tlds.filter(isCompanyDomain)
   return getGroupMajority(companyDomains)
 }
 
-export const up = async function (r: R) {
+export const up = async function(r: R) {
   try {
     await r
       .table('Organization')
@@ -55,9 +55,9 @@ export const up = async function (r: R) {
       .filter({removedAt: null})
       .merge((row) => ({
         email: r
-          .db('actionDevelopment')
           .table('User')
           .get(row('userId'))('email')
+          .default('')
       }))
       .group('orgId')('email')
       .ungroup()
@@ -87,7 +87,7 @@ export const up = async function (r: R) {
   }
 }
 
-export const down = async function (r: R) {
+export const down = async function(r: R) {
   try {
     await r
       .table('Organization')

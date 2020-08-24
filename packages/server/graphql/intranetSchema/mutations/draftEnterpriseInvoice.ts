@@ -1,14 +1,17 @@
 import {GraphQLID, GraphQLInt, GraphQLNonNull} from 'graphql'
 import {OrgUserRole, TierEnum} from 'parabol-client/types/graphql'
-import {DataLoaderWorker, GQLContext} from '../../graphql'
 import getRethink from '../../../database/rethinkDriver'
-import {requireSU} from '../../../utils/authorization'
-import DraftEnterpriseInvoicePayload from '../types/DraftEnterpriseInvoicePayload'
-import StripeManager from '../../../utils/StripeManager'
-import {fromEpochSeconds} from '../../../utils/epochTime'
-import hideConversionModal from '../../mutations/helpers/hideConversionModal'
 import User from '../../../database/types/User'
+import db from '../../../db'
+import {requireSU} from '../../../utils/authorization'
+import {fromEpochSeconds} from '../../../utils/epochTime'
+import segmentIo from '../../../utils/segmentIo'
 import setUserTierForOrgId from '../../../utils/setUserTierForOrgId'
+import StripeManager from '../../../utils/StripeManager'
+import {DataLoaderWorker, GQLContext} from '../../graphql'
+import hideConversionModal from '../../mutations/helpers/hideConversionModal'
+import setTierForOrgUsers from '../../../utils/setTierForOrgUsers'
+import DraftEnterpriseInvoicePayload from '../types/DraftEnterpriseInvoicePayload'
 
 const getBillingLeaderUser = async (
   email: string | null,
@@ -47,12 +50,8 @@ const getBillingLeaderUser = async (
     (organizationUser) => organizationUser.role === OrgUserRole.BILLING_LEADER
   )
   const billingLeaderUserIds = billingLeaders.map(({userId}) => userId)
-  return r
-    .table('User')
-    .getAll(r.args(billingLeaderUserIds))
-    .nth(0)
-    .default(null)
-    .run()
+  const billingLeaderUsers = await db.readMany('User', billingLeaderUserIds)
+  return billingLeaderUsers[0]
 }
 
 export default {
@@ -76,9 +75,17 @@ export default {
       type: GraphQLID,
       description:
         'The email address for Accounts Payable. Use only if the invoice will be sent to a non-user!'
+    },
+    plan: {
+      type: GraphQLID,
+      description: 'the stripe id of the plan in stripe, if not using the default plan'
     }
   },
-  async resolve(_source, {orgId, quantity, email, apEmail}, {authToken, dataLoader}: GQLContext) {
+  async resolve(
+    _source,
+    {orgId, quantity, email, apEmail, plan},
+    {authToken, dataLoader}: GQLContext
+  ) {
     const r = await getRethink()
     const now = new Date()
     // const operationId = dataLoader.share()
@@ -133,7 +140,12 @@ export default {
       customerId = stripeId
     }
 
-    const subscription = await manager.createEnterpriseSubscription(customerId, orgId, quantity)
+    const subscription = await manager.createEnterpriseSubscription(
+      customerId,
+      orgId,
+      quantity,
+      plan
+    )
 
     await r({
       updatedOrg: r
@@ -156,8 +168,16 @@ export default {
         })
     }).run()
 
-    await setUserTierForOrgId(orgId)
-    await hideConversionModal(orgId, dataLoader)
+    await Promise.all([
+      setUserTierForOrgId(orgId),
+      setTierForOrgUsers(orgId),
+      hideConversionModal(orgId, dataLoader)
+    ])
+    segmentIo.track({
+      userId: user.id,
+      event: 'Enterprise invoice drafted',
+      properties: {orgId}
+    })
     dataLoader.get('organizations').clear(orgId)
     return {orgId}
   }

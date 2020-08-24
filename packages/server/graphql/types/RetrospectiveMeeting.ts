@@ -10,6 +10,7 @@ import {
 import {NewMeetingPhaseTypeEnum} from 'parabol-client/types/graphql'
 import {RETROSPECTIVE} from 'parabol-client/utils/constants'
 import toTeamMemberId from 'parabol-client/utils/relay/toTeamMemberId'
+import DiscussPhase from '../../database/types/DiscussPhase'
 import {getUserId} from '../../utils/authorization'
 import filterTasksByMeeting from '../../utils/filterTasksByMeeting'
 import {GQLContext} from '../graphql'
@@ -44,7 +45,8 @@ const RetrospectiveMeeting = new GraphQLObjectType<any, GQLContext>({
     },
     commentCount: {
       type: new GraphQLNonNull(GraphQLInt),
-      description: 'The number of comments generated in the meeting'
+      description: 'The number of comments generated in the meeting',
+      resolve: ({commentCount}) => commentCount || 0
     },
     maxVotesPerGroup: {
       type: GraphQLNonNull(GraphQLInt),
@@ -64,7 +66,8 @@ const RetrospectiveMeeting = new GraphQLObjectType<any, GQLContext>({
     },
     reflectionCount: {
       type: GraphQLNonNull(GraphQLInt),
-      description: 'The number of reflections generated in the meeting'
+      description: 'The number of reflections generated in the meeting',
+      resolve: ({reflectionCount}) => reflectionCount || 0
     },
     reflectionGroup: {
       type: RetroReflectionGroup,
@@ -103,13 +106,19 @@ const RetrospectiveMeeting = new GraphQLObjectType<any, GQLContext>({
           const {phases} = meeting
           const discussPhase = phases.find(
             (phase) => phase.phaseType === NewMeetingPhaseTypeEnum.discuss
-          )
+          ) as DiscussPhase
           if (!discussPhase) return reflectionGroups
           const {stages} = discussPhase
-          // boolean filter in case the meeting was terminated & there are no groups made yet
-          return stages
-            .map((stage) => reflectionGroups.find((group) => group.id === stage.reflectionGroupId))
-            .filter(Boolean)
+          // for early terminations the stages may not exist
+          const sortLookup = {} as {[reflectionGroupId: string]: number}
+          reflectionGroups.forEach((group) => {
+            const idx = stages.findIndex((stage) => stage.reflectionGroupId === group.id)
+            sortLookup[group.id] = idx
+          })
+          reflectionGroups.sort((a, b) => {
+            sortLookup[a.id] < sortLookup[b.id] ? -1 : 1
+          })
+          return reflectionGroups
         }
         reflectionGroups.sort((a, b) => (a.sortOrder < b.sortOrder ? -1 : 1))
         return reflectionGroups
@@ -118,16 +127,14 @@ const RetrospectiveMeeting = new GraphQLObjectType<any, GQLContext>({
     settings: {
       type: new GraphQLNonNull(RetrospectiveMeetingSettings),
       description: 'The settings that govern the retrospective meeting',
-      resolve: async ({id: meetingId}, _args, {dataLoader}) => {
-        const meeting = await dataLoader.get('newMeetings').load(meetingId)
-        const {teamId} = meeting
-        const allSettings = await dataLoader.get('meetingSettingsByTeamId').load(teamId)
-        return allSettings.find((settings) => settings.meetingType === RETROSPECTIVE)
+      resolve: async ({teamId}, _args, {dataLoader}) => {
+        return dataLoader.get('meetingSettingsByType').load({teamId, meetingType: RETROSPECTIVE})
       }
     },
     taskCount: {
       type: new GraphQLNonNull(GraphQLInt),
-      description: 'The number of tasks generated in the meeting'
+      description: 'The number of tasks generated in the meeting',
+      resolve: ({taskCount}) => taskCount || 0
     },
     tasks: {
       type: new GraphQLNonNull(GraphQLList(GraphQLNonNull(Task))),
@@ -140,9 +147,13 @@ const RetrospectiveMeeting = new GraphQLObjectType<any, GQLContext>({
         return filterTasksByMeeting(teamTasks, meetingId, viewerId)
       }
     },
+    teamId: {
+      type: GraphQLNonNull(GraphQLID)
+    },
     topicCount: {
       type: GraphQLNonNull(GraphQLInt),
-      description: 'The number of topics generated in the meeting'
+      description: 'The number of topics generated in the meeting',
+      resolve: ({topicCount}) => topicCount || 0
     },
     totalVotes: {
       type: GraphQLNonNull(GraphQLInt),
@@ -169,15 +180,6 @@ const RetrospectiveMeeting = new GraphQLObjectType<any, GQLContext>({
         return dataLoader.get('meetingMembers').load(meetingMemberId)
       }
     }
-    // reflections: {
-    //   type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(RetroReflection))),
-    //   description: 'The reflections generated during the reflect phase of the retro',
-    //   resolve: async ({id}, args, {dataLoader}) => {
-    //     const reflections = await dataLoader.get('retroReflectionsByMeetingId').load(id);
-    //     reflections.sort((a, b) => a.sortOrder < b.sortOrder ? -1 : 1);
-    //     return reflections;
-    //   }
-    // }
   })
 })
 

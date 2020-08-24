@@ -13,10 +13,12 @@ import createTeamAndLeader from './createTeamAndLeader'
 
 // no waiting necessary, it's just analytics
 const handleSegment = async (user: User, isInvited: boolean) => {
-  const {id: userId, email, segmentId, preferredName} = user
+  const {id: userId, createdAt, email, segmentId, picture, preferredName} = user
   segmentIo.identify({
     userId,
     traits: {
+      avatar: picture,
+      createdAt,
       email,
       name: preferredName
     },
@@ -26,7 +28,11 @@ const handleSegment = async (user: User, isInvited: boolean) => {
     userId,
     event: 'Account Created',
     properties: {
-      isInvited
+      isInvited,
+      // properties below required for Google Analytics destination
+      category: 'All',
+      label: 'isInvited',
+      value: isInvited ? 1 : 0
     }
   })
 }

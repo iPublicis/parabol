@@ -42,7 +42,7 @@ import Team from './types/Team'
 import TimelineEvent from './types/TimelineEvent'
 import User from './types/User'
 
-export type RethinkTypes = {
+export type RethinkSchema = {
   AgendaItem: {
     type: AgendaItem
     index: 'teamId' | 'meetingId'
@@ -55,9 +55,9 @@ export type RethinkTypes = {
     type: Comment
     index: 'threadId'
   }
-  CustomPhaseItem: {
+  ReflectPrompt: {
     type: RetrospectivePrompt
-    index: 'teamId'
+    index: 'teamId' | 'templateId'
   }
   EmailVerification: {
     type: any
@@ -93,7 +93,7 @@ export type RethinkTypes = {
   }
   NewMeeting: {
     type: MeetingRetrospective | MeetingAction
-    index: 'facilitatorUserId' | 'teamId'
+    index: 'facilitatorUserId' | 'teamId' | 'templateId'
   }
   NewFeature: {
     type: INewFeatureBroadcast
@@ -101,13 +101,13 @@ export type RethinkTypes = {
   }
   Notification: {
     type:
-    | NotificationTaskInvolves
-    | NotificationTeamArchived
-    | NotificationMeetingStageTimeLimitEnd
-    | NotificationPaymentRejected
-    | NotificationKickedOut
-    | NotificationPromoteToBillingLeader
-    | NotificationTeamInvitation
+      | NotificationTaskInvolves
+      | NotificationTeamArchived
+      | NotificationMeetingStageTimeLimitEnd
+      | NotificationPaymentRejected
+      | NotificationKickedOut
+      | NotificationPromoteToBillingLeader
+      | NotificationTeamInvitation
     index: 'userId'
   }
   Organization: {
@@ -136,7 +136,7 @@ export type RethinkTypes = {
   }
   ReflectTemplate: {
     type: ReflectTemplate
-    index: 'teamId'
+    index: 'teamId' | 'orgId'
   }
   RetroReflectionGroup: {
     type: ReflectionGroup
@@ -202,8 +202,11 @@ export type RethinkTypes = {
   }
 }
 
-type ParabolR = R<RethinkTypes>
+export type DBType = {
+  [P in keyof RethinkSchema]: RethinkSchema[P]['type']
+}
 
+type ParabolR = R<RethinkSchema>
 const config = getRethinkConfig()
 let isLoading = false
 let isLoaded = false
